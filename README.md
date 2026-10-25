@@ -4,15 +4,50 @@ A WooCommerce store on Kubernetes with a custom TypeScript MCP server, a team ga
 
 ## Architecture
 
-```text
-Browser -> Ingress -> React dashboard + gateway API/chat
-MCP client -------> gateway /mcp -> WooCommerce MCP -> WooCommerce REST -> MariaDB
-                                -> Time MCP
-                                -> Math MCP
-Gateway chat -----> Gemini API -> gateway tool discovery/execution
+```mermaid
+flowchart TB
+    Users["Team browsers<br/>Store shoppers<br/>External MCP clients"]
+    Gemini["Gemini API<br/>Hosted outside the cluster"]
+
+    subgraph Cluster["Kubernetes · local k3d / production k3s"]
+        Ingress["Traefik Ingress<br/>Public routing"]
+        subgraph Namespace["Namespace: urumi"]
+            Dashboard["React dashboard"]
+            Gateway["Team gateway<br/>API / MCP / chat / audit"]
+            subgraph Upstreams["Internal MCP Services · gateway-only NetworkPolicies"]
+                Woo["WooCommerce MCP<br/>5 tools"]
+                Time["Time MCP<br/>2 tools"]
+                Math["Math MCP<br/>2 tools"]
+            end
+            WordPress["WordPress / WooCommerce<br/>Store + REST API"]
+            MariaDB[("MariaDB")]
+        end
+    end
+
+    Users -->|"HTTP / HTTPS"| Ingress
+    Ingress -->|"Dashboard host: /"| Dashboard
+    Ingress -->|"/api: session cookie · /mcp: user API key"| Gateway
+    Ingress -->|"Store host: /"| WordPress
+    Gateway -->|"Streamable HTTP"| Woo
+    Gateway -->|"Streamable HTTP"| Time
+    Gateway -->|"Streamable HTTP"| Math
+    Woo -->|"Signed REST requests"| WordPress
+    WordPress -->|"SQL"| MariaDB
+    Gemini ---|"HTTPS model API · gateway-initiated"| Gateway
 ```
 
-WordPress/WooCommerce sits between the WooCommerce REST API and MariaDB. Everything except the hosted model runs in the cluster. Upstream MCP Services are internal, with gateway-only NetworkPolicies and separate authentication credentials. Store, database and gateway data use persistent volumes.
+All public application traffic enters through Ingress. Upstream MCP servers have no public route: NetworkPolicies allow only gateway Pods, and each upstream also checks its own credential. Chat executes tools through the gateway as the signed-in user; Gemini never connects directly to an upstream.
+
+| Component | Kubernetes resources | Persistent data / credential boundary |
+| --- | --- | --- |
+| Dashboard | Deployment + ClusterIP Service | Static React assets; browser uses an HttpOnly session cookie for API/chat requests |
+| Gateway | Deployment + ClusterIP Service + PVC | SQLite users, key hashes, sessions, registrations and audits; reads upstream tokens from Secrets; receives the Gemini key |
+| WooCommerce MCP | Deployment + ClusterIP Service + NetworkPolicy | Checks its upstream bearer token; uses separate WooCommerce REST credentials from Secrets |
+| Time / Math MCP | Deployments + ClusterIP Services + NetworkPolicies | Time checks a bearer token; Math checks `X-Upstream-Key`; tokens come from Secrets |
+| WordPress | Deployment + ClusterIP Service + PVC | Plugins/uploads persist on the WordPress volume; database password comes from a Secret |
+| MariaDB | StatefulSet + internal Service + PVC | Store database persists on its own volume; database passwords come from a Secret |
+
+Each PVC is backed by a persistent volume. Services provide stable addresses when Kubernetes replaces Pods. External clients supply only their gateway key, and only the gateway receives the Gemini key. See [system design](docs/SYSTEM_DESIGN.md) and [credential configuration](docs/CONFIGURATION.md) for details.
 
 | Local service | URL |
 | --- | --- |
