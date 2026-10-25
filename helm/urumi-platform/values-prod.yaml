@@ -1,0 +1,18 @@
+# Push both images to your registry and create the documented Secrets first.
+image: registry.example.com/urumi/phase2:0.2.1
+dashboardImage: registry.example.com/urumi/dashboard:0.2.1
+chat:
+  enabled: true
+imagePullPolicy: IfNotPresent
+storageClass: local-path
+storageSize: 5Gi
+ingress:
+  className: traefik
+  host: dashboard.example.com
+  tlsSecret: urumi-dashboard-tls
+origin: https://dashboard.example.com
+mcpUrl: https://dashboard.example.com/mcp
+cookieSecure: true
+woo:
+  internalUrl: http://urumi-store-wordpress
+  publicUrl: https://store.example.com

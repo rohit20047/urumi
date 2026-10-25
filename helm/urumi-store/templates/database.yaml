@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-mariadb
+spec:
+  serviceName: {{ .Release.Name }}-mariadb
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-mariadb
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-mariadb
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: mariadb
+          image: {{ .Values.database.image | quote }}
+          ports:
+            - {name: mysql, containerPort: 3306}
+          env:
+            - {name: MARIADB_DATABASE, value: {{ .Values.database.name | quote }}}
+            - {name: MARIADB_USER, value: {{ .Values.database.user | quote }}}
+            - name: MARIADB_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: {{ .Values.existingSecret }}, key: database-password}
+            - name: MARIADB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: {{ .Values.existingSecret }}, key: database-root-password}
+          startupProbe:
+            exec: {command: [healthcheck.sh, --connect, --innodb_initialized]}
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            exec: {command: [healthcheck.sh, --connect, --innodb_initialized]}
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec: {command: [healthcheck.sh, --connect]}
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            {{- toYaml .Values.database.resources | nindent 12 }}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/mysql}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-mariadb
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-mariadb
+spec:
+  clusterIP: None
+  selector:
+    app: {{ .Release.Name }}-mariadb
+  ports:
+    - {name: mysql, port: 3306, targetPort: mysql}

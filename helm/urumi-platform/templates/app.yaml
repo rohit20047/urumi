@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-data
+  annotations: {helm.sh/resource-policy: keep}
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- if .Values.storageClass }}
+  storageClassName: {{ .Values.storageClass }}
+  {{- end }}
+  resources:
+    requests: {storage: {{ .Values.storageSize }}}
+---
+{{ range $role := list "gateway" "woocommerce" "time" "math" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-{{ $role }}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: {{ $.Release.Name }}-{{ $role }}}
+  template:
+    metadata:
+      labels: {app: {{ $.Release.Name }}-{{ $role }}, urumi-role: {{ $role }}}
+    spec:
+      {{- if eq $role "gateway" }}
+      serviceAccountName: {{ $.Release.Name }}-gateway
+      {{- else }}
+      automountServiceAccountToken: false
+      {{- end }}
+      securityContext: {runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000}
+      containers:
+        - name: app
+          image: {{ $.Values.image | quote }}
+          imagePullPolicy: {{ $.Values.imagePullPolicy }}
+          ports: [{name: http, containerPort: 8000}]
+          env:
+            - {name: APP_ROLE, value: {{ $role | quote }}}
+            {{- if eq $role "gateway" }}
+            - {name: APP_ORIGIN, value: {{ $.Values.origin | quote }}}
+            - {name: MCP_PUBLIC_URL, value: {{ $.Values.mcpUrl | quote }}}
+            - {name: COOKIE_SECURE, value: {{ $.Values.cookieSecure | quote }}}
+            - {name: SERVICE_PREFIX, value: {{ $.Release.Name | quote }}}
+            - {name: CHAT_ENABLED, value: {{ $.Values.chat.enabled | quote }}}
+            - {name: LLM_MODEL, value: {{ $.Values.chat.model | quote }}}
+            - {name: CHAT_TIMEZONE, value: {{ $.Values.chat.timezone | quote }}}
+            {{- if $.Values.chat.enabled }}
+            - name: GEMINI_API_KEY
+              valueFrom: {secretKeyRef: {name: {{ $.Values.chat.existingSecret }}, key: GEMINI_API_KEY}}
+            {{- end }}
+            - name: POD_NAMESPACE
+              valueFrom: {fieldRef: {fieldPath: metadata.namespace}}
+            - name: ADMIN_EMAIL
+              valueFrom: {secretKeyRef: {name: urumi-platform-admin, key: email}}
+            - name: ADMIN_PASSWORD
+              valueFrom: {secretKeyRef: {name: urumi-platform-admin, key: password}}
+            {{- else }}
+            - name: UPSTREAM_TOKEN
+              valueFrom: {secretKeyRef: {name: urumi-upstream-{{ $role }}, key: value}}
+            {{- end }}
+            {{- if eq $role "woocommerce" }}
+            - {name: WOO_INTERNAL_URL, value: {{ $.Values.woo.internalUrl | quote }}}
+            - {name: WOO_PUBLIC_URL, value: {{ $.Values.woo.publicUrl | quote }}}
+            - name: WOO_CONSUMER_KEY
+              valueFrom: {secretKeyRef: {name: urumi-woo-rest, key: consumer_key}}
+            - name: WOO_CONSUMER_SECRET
+              valueFrom: {secretKeyRef: {name: urumi-woo-rest, key: consumer_secret}}
+            {{- end }}
+          startupProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 3, failureThreshold: 40}
+          readinessProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 5, timeoutSeconds: 2}
+          livenessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 15, timeoutSeconds: 2}
+          resources:
+            {{- toYaml $.Values.resources | nindent 12 }}
+          {{- if eq $role "gateway" }}
+          volumeMounts: [{name: data, mountPath: /data}]
+          {{- end }}
+      {{- if eq $role "gateway" }}
+      volumes: [{name: data, persistentVolumeClaim: {claimName: {{ $.Release.Name }}-data}}]
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Release.Name }}-{{ $role }}
+spec:
+  selector: {app: {{ $.Release.Name }}-{{ $role }}}
+  ports: [{name: http, port: 8000, targetPort: http}]
+---
+{{ end }}

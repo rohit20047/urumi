@@ -1,0 +1,6 @@
+apiVersion: v2
+name: urumi-platform
+description: TypeScript team MCP gateway, upstream servers and React dashboard
+type: application
+version: 0.2.1
+appVersion: "0.2.1"

@@ -1,0 +1,23 @@
+{
+  "name": "urumi-dashboard",
+  "private": true,
+  "version": "0.2.1",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "test": "tsc src/result-format.ts --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir .test-dist --skipLibCheck && node --test tests/result-format.test.mjs"
+  },
+  "dependencies": {
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.6",
+    "@types/react-dom": "19.1.6",
+    "typescript": "5.8.3",
+    "vite": "6.4.4"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}

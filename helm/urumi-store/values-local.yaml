@@ -1,0 +1,9 @@
+# Ubuntu WSL k3d; Docker maps localhost:8080 to the load balancer's HTTP port.
+storageClass: local-path
+wordpress:
+  localLoopback: true
+ingress:
+  className: traefik
+  host: store.localhost
+site:
+  url: http://store.localhost:8080

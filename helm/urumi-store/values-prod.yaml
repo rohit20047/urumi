@@ -1,0 +1,16 @@
+# Replace example domain/email, create the existing Secret and TLS Secret,
+# and choose the VPS StorageClass before installation. No credentials go here.
+storageClass: local-path
+ingress:
+  className: traefik
+  host: store.example.com
+  tlsSecret: urumi-store-tls
+site:
+  environment: production
+  url: https://store.example.com
+  adminEmail: admin@example.com
+wordpress:
+  localLoopback: false
+  storageSize: 10Gi
+database:
+  storageSize: 10Gi

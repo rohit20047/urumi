@@ -1,0 +1,9 @@
+{{- if .Values.wordpress.localLoopback }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-local-loopback
+data:
+  urumi-local-loopback.php: |
+{{ .Files.Get "files/urumi-local-loopback.php" | indent 4 }}
+{{- end }}

@@ -1,0 +1,24 @@
+image: urumi/phase2:0.2.1
+dashboardImage: urumi/dashboard:0.2.1
+chat:
+  enabled: false
+  model: gemini-3.5-flash-lite
+  timezone: Asia/Kolkata
+  existingSecret: urumi-gemini
+imagePullPolicy: IfNotPresent
+storageClass: ""
+storageSize: 2Gi
+ingress:
+  className: traefik
+  host: dashboard.localhost
+  tlsSecret: ""
+origin: http://dashboard.localhost:8080
+mcpUrl: http://localhost:8080/mcp
+localMcpHost: ""
+cookieSecure: false
+woo:
+  internalUrl: http://urumi-store-wordpress
+  publicUrl: http://store.localhost:8080
+resources:
+  requests: {cpu: 50m, memory: 96Mi}
+  limits: {cpu: "1", memory: 384Mi}

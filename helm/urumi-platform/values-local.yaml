@@ -1,0 +1,5 @@
+storageClass: local-path
+imagePullPolicy: Never
+localMcpHost: localhost
+chat:
+  enabled: true
