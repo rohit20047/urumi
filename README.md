@@ -4,37 +4,9 @@ A WooCommerce store on Kubernetes with a custom TypeScript MCP server, a team ga
 
 ## Architecture
 
-```mermaid
-flowchart TB
-    Users["Team browsers<br/>Store shoppers<br/>External MCP clients"]
-    Gemini["Gemini API<br/>Hosted outside the cluster"]
+![Urumi architecture: clients, Kubernetes gateway, MCP servers, WooCommerce, MariaDB and Gemini](docs/images/architecture.png)
 
-    subgraph Cluster["Kubernetes · local k3d / production k3s"]
-        Ingress["Traefik Ingress<br/>Public routing"]
-        subgraph Namespace["Namespace: urumi"]
-            Dashboard["React dashboard"]
-            Gateway["Team gateway<br/>API / MCP / chat / audit"]
-            subgraph Upstreams["Internal MCP Services · gateway-only NetworkPolicies"]
-                Woo["WooCommerce MCP<br/>5 tools"]
-                Time["Time MCP<br/>2 tools"]
-                Math["Math MCP<br/>2 tools"]
-            end
-            WordPress["WordPress / WooCommerce<br/>Store + REST API"]
-            MariaDB[("MariaDB")]
-        end
-    end
-
-    Users -->|"HTTP / HTTPS"| Ingress
-    Ingress -->|"Dashboard host: /"| Dashboard
-    Ingress -->|"/api: session cookie · /mcp: user API key"| Gateway
-    Ingress -->|"Store host: /"| WordPress
-    Gateway -->|"Streamable HTTP"| Woo
-    Gateway -->|"Streamable HTTP"| Time
-    Gateway -->|"Streamable HTTP"| Math
-    Woo -->|"Signed REST requests"| WordPress
-    WordPress -->|"SQL"| MariaDB
-    Gemini ---|"HTTPS model API · gateway-initiated"| Gateway
-```
+[Editable diagram source](docs/images/architecture.mmd)
 
 All public application traffic enters through Ingress. Upstream MCP servers have no public route: NetworkPolicies allow only gateway Pods, and each upstream also checks its own credential. Chat executes tools through the gateway as the signed-in user; Gemini never connects directly to an upstream.
 

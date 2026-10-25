@@ -1,0 +1,45 @@
+flowchart TB
+    Users["Team browsers<br/>Store shoppers<br/>External MCP clients"]
+    Gemini["Gemini API<br/>Hosted outside the cluster"]
+
+    subgraph Cluster["Kubernetes · local k3d / production k3s"]
+        Ingress["Traefik Ingress<br/>Public routing"]
+        subgraph Namespace["Namespace: urumi"]
+            Dashboard["React dashboard"]
+            Gateway["Team gateway<br/>API / MCP / chat / audit"]
+            subgraph Upstreams["Internal MCP Services · gateway-only NetworkPolicies"]
+                Woo["WooCommerce MCP<br/>5 tools"]
+                Time["Time MCP<br/>2 tools"]
+                Math["Math MCP<br/>2 tools"]
+            end
+            WordPress["WordPress / WooCommerce<br/>Store + REST API"]
+            MariaDB[("MariaDB")]
+        end
+    end
+
+    Users -->|"HTTP / HTTPS"| Ingress
+    Ingress -->|"Dashboard host: /"| Dashboard
+    Ingress -->|"/api: session cookie · /mcp: user API key"| Gateway
+    Ingress -->|"Store host: /"| WordPress
+    Gateway -->|"Streamable HTTP"| Woo
+    Gateway -->|"Streamable HTTP"| Time
+    Gateway -->|"Streamable HTTP"| Math
+    Woo -->|"Signed REST requests"| WordPress
+    WordPress -->|"SQL"| MariaDB
+    Gemini ---|"HTTPS model API · gateway-initiated"| Gateway
+
+    classDef user fill:#f8fafc,stroke:#94a3b8,color:#0f172a;
+    classDef entry fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e;
+    classDef service fill:#eff6ff,stroke:#3b82f6,color:#1e3a8a;
+    classDef upstream fill:#f0fdf4,stroke:#16a34a,color:#14532d;
+    classDef data fill:#fff7ed,stroke:#ea580c,color:#7c2d12;
+    classDef external fill:#faf5ff,stroke:#9333ea,color:#581c87;
+    class Users user;
+    class Ingress entry;
+    class Dashboard,Gateway service;
+    class Woo,Time,Math upstream;
+    class WordPress,MariaDB data;
+    class Gemini external;
+    style Cluster fill:#f8fafc,stroke:#64748b
+    style Namespace fill:#ffffff,stroke:#cbd5e1
+    style Upstreams fill:#f0fdf4,stroke:#86efac
