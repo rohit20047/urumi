@@ -39,6 +39,22 @@ Each PVC is backed by a persistent volume. Services provide stable addresses whe
 
 Read [system design and tradeoffs](docs/SYSTEM_DESIGN.md), [threat model](docs/THREAT_MODEL.md), [configuration](docs/CONFIGURATION.md), [testing](docs/TESTING.md) and [demo guide](docs/DEMO_GUIDE.md).
 
+## Assignment deliverables
+
+| Required deliverable | Where to find it |
+| --- | --- |
+| Local setup and production-like VPS setup | [Fresh local setup](#fresh-local-setup) and [Production-like VPS](#production-like-vps) below |
+| Manual order, dashboard chat and external MCP connection | [Store, team and chat](#store-team-and-chat), [External MCP client](#external-mcp-client) and [live demo guide](docs/DEMO_GUIDE.md) |
+| Dashboard source | [React dashboard](phase2/dashboard/src/) |
+| Backend, authentication and gateway source | [API](phase2/src/api.ts), [gateway](phase2/src/gateway.ts) and [MCP endpoint](phase2/src/protocol.ts) |
+| Custom WooCommerce MCP server | [WooCommerce adapter](phase2/src/woo.ts) |
+| Chat agent and UI | [Gemini tool loop](phase2/src/chat.ts) and [chat interface](phase2/dashboard/src/Chat.tsx) |
+| Helm charts and local/production values | [Store chart](helm/urumi-store/) and [platform chart](helm/urumi-platform/); both contain `values-local.yaml` and `values-prod.yaml` |
+| Architecture choices, aggregation, routing, failures and production changes | [System design and tradeoffs](docs/SYSTEM_DESIGN.md) |
+| Shared credentials, token separation, malicious upstreams and effects on other members | [Threat model](docs/THREAT_MODEL.md) |
+
+No optional bonus or stand-out item is claimed. The scope is the mandatory assignment; limitations and unimplemented optional protections are listed in the design and threat model. The final demo video and submission are separate deliverables to be completed by the author.
+
 ## Fresh local setup
 
 Prerequisites: Docker Engine, k3d 5.9.0, kubectl, Helm 3, Node.js 22.19 or newer, Python 3 and access to container registries, WordPress.org and Gemini. Linux commands can also run in WSL with Docker Desktop integration.
@@ -148,6 +164,15 @@ The mandatory core was exercised on 24 October 2026: 15 backend tests, 15 dashbo
 Use the same charts on a Linux VPS with k3s, Helm, persistent disk, DNS and sufficient resources. Publish both images to your registry. Copy the supplied production values into private deployment values and configure image paths, domains, TLS Secret names, HTTPS origins/MCP/store URLs and storage class/capacities.
 
 Create the target namespace and provision the [documented Secrets](docs/CONFIGURATION.md) separately using new production credentials. WooCommerce REST credentials must match the target store. Supply the TLS Secrets referenced by the values. Expose intended Ingress ports, retain internal Services/network isolation and allow outbound HTTPS required by Gemini and provisioning.
+
+First select and verify the intended VPS Kubernetes context, then create the namespace if it does not already exist:
+
+```bash
+kubectl config current-context
+kubectl create namespace urumi --dry-run=client -o yaml | kubectl apply -f -
+```
+
+The bundled local cluster/provisioning helpers target `k3d-urumi-local`; do not use them to bootstrap a VPS. Install the store with its credential and TLS Secrets first. Once it is ready, create a read/write WooCommerce REST key in that store's admin and provision `urumi-woo-rest`, the platform admin/upstream Secrets and the Gemini Secret before installing the platform. The required Secret names, fields and consumers are listed in [configuration](docs/CONFIGURATION.md). Use private files or a secret manager; do not put production credentials in the values files. Point both production DNS names at the VPS and provision certificates matching those names.
 
 ```bash
 helm upgrade --install urumi-store helm/urumi-store -n urumi \
